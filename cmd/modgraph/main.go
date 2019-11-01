@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/emicklei/dot"
@@ -60,6 +61,15 @@ func color() (string, string) {
 
 func isInModule(mod string, pkg string) bool {
 	return mod == pkg || strings.HasPrefix(pkg, mod+"/")
+}
+
+func isInternal(pkg string) bool {
+	return strings.Contains(pkg, "/internal/") ||
+		strings.HasSuffix(pkg, "/internal")
+}
+
+func isParent(parent, child string) bool {
+	return strings.HasPrefix(child, parent+"/")
 }
 
 func main() {
@@ -141,9 +151,10 @@ func main() {
 			node.Attr("margin", "0.15")
 			node.Attr("penwidth", "2")
 			node.Attr("color", "#ffffff")
+			node.Attr("rank", strconv.Itoa(len(qual)))
 
 			edgeColor := "#eeeeee"
-			if strings.Contains(qual, "/internal/") {
+			if isInternal(qual) {
 				node.Attr("fontcolor", "#888888")
 				node.Attr("fillcolor", "#f3f3f3")
 			} else {
@@ -162,11 +173,11 @@ func main() {
 					edge.Attr("color", edgeColor)
 					edge.Attr("arrowsize", "0.75")
 
-					if strings.Contains(p, "/internal/") {
+					if isInternal(p) {
 						edge.Attr("style", "dashed")
 					}
 
-					if strings.HasPrefix(qual+"/", p) {
+					if isParent(p, qual) {
 						edge.Attr("constraint", "false")
 
 						con := graph.Edge(targeted, node)
