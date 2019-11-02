@@ -7,7 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
+	"sort"
 	"strings"
 
 	"github.com/emicklei/dot"
@@ -63,15 +63,6 @@ func isInModule(mod string, pkg string) bool {
 	return mod == pkg || strings.HasPrefix(pkg, mod+"/")
 }
 
-func isInternal(pkg string) bool {
-	return strings.Contains(pkg, "/internal/") ||
-		strings.HasSuffix(pkg, "/internal")
-}
-
-func isParent(parent, child string) bool {
-	return strings.HasPrefix(child, parent+"/")
-}
-
 func main() {
 	root := "."
 	if len(os.Args) > 1 {
@@ -98,13 +89,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	graph := dot.NewGraph(dot.Directed)
-	graph.Attr("rankdir", "BT")
-	graph.Attr("concentrate", "false")
-	graph.Attr("splines", "true")
-	graph.Attr("overlap", "false")
-	graph.Attr("nodesep", "0.15")
-	graph.Attr("outputorder", "edgesfirst")
+	var packages []string
+	imports := importMap{}
 
 	if err := filepath.Walk(
 		root,
@@ -125,10 +111,9 @@ func main() {
 				return err
 			}
 
-			disp := strings.ReplaceAll(rel, "/", "\n")
-			qual := mf.Module.Mod.Path
+			p := mf.Module.Mod.Path
 			if root != dir {
-				qual += "/" + rel
+				p += "/" + rel
 				rel = "./" + rel
 			}
 
@@ -139,58 +124,78 @@ func main() {
 				return err
 			}
 
-			if disp == "." {
-				disp = "(" + pkg.Name + ")"
-			}
-
-			node := graph.Node(qual)
-			node.Label(disp)
-			node.Attr("style", "filled")
-			node.Attr("shape", "box")
-			node.Attr("fontname", "Helvetica")
-			node.Attr("margin", "0.15")
-			node.Attr("penwidth", "2")
-			node.Attr("color", "#ffffff")
-			node.Attr("rank", strconv.Itoa(len(qual)))
-
-			edgeColor := "#eeeeee"
-			if isInternal(qual) {
-				node.Attr("fontcolor", "#888888")
-				node.Attr("fillcolor", "#f3f3f3")
-			} else {
-				fg, bg := color()
-				edgeColor = bg
-				node.Attr("fontcolor", fg)
-				node.Attr("fillcolor", bg)
-			}
-
-			for _, p := range pkg.Imports {
-				if isInModule(mf.Module.Mod.Path, p) {
-					targeted := graph.Node(p)
-
-					edge := graph.Edge(node, targeted)
-					edge.Attr("penwidth", "2")
-					edge.Attr("color", edgeColor)
-					edge.Attr("arrowsize", "0.75")
-
-					if isInternal(p) {
-						edge.Attr("style", "dashed")
-					}
-
-					if isParent(p, qual) {
-						edge.Attr("constraint", "false")
-
-						con := graph.Edge(targeted, node)
-						con.Attr("constraint", "true")
-						con.Attr("style", "invis")
-					}
+			for _, dep := range pkg.Imports {
+				if isInModule(mf.Module.Mod.Path, dep) {
+					imports.AddImport(p, dep)
 				}
 			}
+
+			packages = append(packages, p)
 
 			return nil
 		},
 	); err != nil {
 		log.Fatal(err)
+	}
+
+	sort.Strings(packages)
+
+	graph := dot.NewGraph(dot.Directed)
+	graph.Attr("rankdir", "BT")
+	graph.Attr("concentrate", "false")
+	graph.Attr("splines", "true")
+	graph.Attr("overlap", "false")
+	graph.Attr("nodesep", "0.15")
+	graph.Attr("outputorder", "edgesfirst")
+
+	for _, p := range packages {
+		n := imports.Get(p)
+
+		if n.IsHidden() {
+			continue
+		}
+
+		node := graph.Node(p)
+		node.Label(n.Label(mf.Module.Mod.Path))
+		node.Attr("style", "filled")
+		node.Attr("shape", "box")
+		node.Attr("fontname", "Helvetica")
+		node.Attr("margin", "0.15")
+		node.Attr("penwidth", "2")
+		node.Attr("color", "#ffffff")
+
+		if n.IsInternal() {
+			node.Attr("fontcolor", "#888888")
+			node.Attr("fillcolor", "#f3f3f3")
+		} else {
+			fg, bg := color()
+			node.Attr("fontcolor", fg)
+			node.Attr("fillcolor", bg)
+		}
+	}
+
+	for _, n := range imports {
+		if n.IsHidden() {
+			continue
+		}
+
+		node := graph.Node(n.Path)
+
+		for _, i := range n.Imports {
+			if n.IsHidden() {
+				continue
+			}
+
+			target := graph.Node(i.Path)
+			edge := graph.Edge(node, target)
+			edge.Attr("penwidth", "2")
+			edge.Attr("color", node.Value("fillcolor").(string))
+			edge.Attr("arrowsize", "0.75")
+
+			if i.IsInternal() {
+				edge.Attr("style", "dashed")
+			}
+		}
 	}
 
 	graph.Write(os.Stdout)
