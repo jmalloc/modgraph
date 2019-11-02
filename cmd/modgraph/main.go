@@ -189,11 +189,16 @@ func main() {
 			target := graph.Node(i.Path)
 			edge := graph.Edge(node, target)
 			edge.Attr("penwidth", "2")
-			edge.Attr("color", node.Value("fillcolor").(string))
 			edge.Attr("arrowsize", "0.75")
 
 			if i.IsInternal() {
 				edge.Attr("style", "dashed")
+			}
+
+			if n.IsInternal() {
+				edge.Attr("color", "#dddddd")
+			} else {
+				edge.Attr("color", node.Value("fillcolor").(string))
 			}
 		}
 	}
