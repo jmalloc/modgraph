@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"go/build"
 	"io/ioutil"
 	"log"
@@ -64,9 +65,14 @@ func isInModule(mod string, pkg string) bool {
 }
 
 func main() {
+	var showInternals bool
+	flag.BoolVar(&showInternals, "show-internals", false, "show usage of internal packages")
+	flag.Parse()
+
 	root := "."
-	if len(os.Args) > 1 {
-		root = os.Args[1]
+	args := flag.Args()
+	if len(args) > 0 {
+		root = args[0]
 	}
 
 	if !filepath.IsAbs(root) {
@@ -151,7 +157,7 @@ func main() {
 	for _, p := range packages {
 		n := imports.Get(p)
 
-		if n.IsHidden() {
+		if n.IsHidden(showInternals) {
 			continue
 		}
 
@@ -175,14 +181,14 @@ func main() {
 	}
 
 	for _, n := range imports {
-		if n.IsHidden() {
+		if n.IsHidden(showInternals) {
 			continue
 		}
 
 		node := graph.Node(n.Path)
 
 		for _, i := range n.Imports {
-			if n.IsHidden() {
+			if i.IsHidden(showInternals) {
 				continue
 			}
 

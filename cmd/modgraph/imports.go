@@ -19,16 +19,22 @@ func (n *node) Label(mod string) string {
 }
 
 func (n *node) IsInternal() bool {
-	return strings.Contains(n.Path, "/internal/") || strings.HasSuffix(n.Path, "/internal")
+	return strings.HasPrefix(n.Path, "internal/") ||
+		strings.Contains(n.Path, "/internal/") ||
+		strings.HasSuffix(n.Path, "/internal")
 }
 
-func (n *node) IsHidden() bool {
+func (n *node) IsHidden(showInternal bool) bool {
+	if !showInternal {
+		return n.IsInternal()
+	}
+
 	if !n.IsInternal() {
 		return false
 	}
 
 	for _, i := range n.ImportedBy {
-		if !i.IsHidden() {
+		if !i.IsHidden(showInternal) {
 			return false
 		}
 	}
