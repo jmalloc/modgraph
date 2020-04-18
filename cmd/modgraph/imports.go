@@ -24,24 +24,6 @@ func (n *node) IsInternal() bool {
 		strings.HasSuffix(n.Path, "/internal")
 }
 
-func (n *node) IsHidden(showInternal bool) bool {
-	if !showInternal {
-		return n.IsInternal()
-	}
-
-	if !n.IsInternal() {
-		return false
-	}
-
-	for _, i := range n.ImportedBy {
-		if !i.IsHidden(showInternal) {
-			return false
-		}
-	}
-
-	return true
-}
-
 type importMap map[string]*node
 
 func (m importMap) Get(p string) *node {

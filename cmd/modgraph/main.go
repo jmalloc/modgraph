@@ -65,8 +65,14 @@ func isInModule(mod string, pkg string) bool {
 }
 
 func main() {
-	var showInternals bool
-	flag.BoolVar(&showInternals, "show-internals", false, "show usage of internal packages")
+	vis := &visibility{
+		HideShallow:   hideSet{},
+		HideRecursive: hideSet{},
+	}
+
+	flag.BoolVar(&vis.ShowInternal, "show-internals", false, "show usage of internal packages")
+	flag.Var(vis.HideRecursive, "hide", "exclude a particular directory and all of its children")
+	flag.Var(vis.HideShallow, "hide-shallow", "exclude a particular directory but retain its children")
 	flag.Parse()
 
 	root := "."
@@ -94,6 +100,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	vis.ModulePath = mf.Module.Mod.Path
 
 	var packages []string
 	imports := importMap{}
@@ -157,7 +165,7 @@ func main() {
 	for _, p := range packages {
 		n := imports.Get(p)
 
-		if n.IsHidden(showInternals) {
+		if vis.IsHidden(n) {
 			continue
 		}
 
@@ -181,14 +189,14 @@ func main() {
 	}
 
 	for _, n := range imports {
-		if n.IsHidden(showInternals) {
+		if vis.IsHidden(n) {
 			continue
 		}
 
 		node := graph.Node(n.Path)
 
 		for _, i := range n.Imports {
-			if i.IsHidden(showInternals) {
+			if vis.IsHidden(i) {
 				continue
 			}
 
