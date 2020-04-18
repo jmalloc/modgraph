@@ -25,7 +25,10 @@ type visibility struct {
 }
 
 func (v *visibility) IsHidden(n *node) bool {
-	rel := strings.TrimSuffix(strings.TrimPrefix(n.Path, v.ModulePath+"/"), "/")
+	rel := "."
+	if n.Path != v.ModulePath {
+		rel = strings.TrimSuffix(strings.TrimPrefix(n.Path, v.ModulePath+"/"), "/")
+	}
 
 	if _, ok := v.HideShallow[rel]; ok {
 		return true
